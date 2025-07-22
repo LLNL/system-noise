@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+type: software
+message: "To reference the Parallel FWQ benchmark, please cite the paper below."
+authors:
+- family-names: "León"
+  given-names: "Edgar A."
+  orcid: "https://orcid.org/0000-0001-5805-9046"
+- family-names: "Moody"
+  given-names: "Adam T."
+  orcid: "https://orcid.org/0000-0000-0000-0000"
+title: "Parallel FWQ"
+preferred-citation:
+  type: conference-paper
+  authors:
+  - family-names: "León"
+    given-names: "Edgar A."
+    orcid: "https://orcid.org/0000-0001-5805-9046"
+  - family-names: "Karlin"
+    given-names: "Ian"
+  - family-names: "Moody"
+    given-names: "Adam T."
+  doi: "10.1109/IPDPS.2016.48"
+  conference:
+    name: "IEEE International Parallel and Distributed Processing Symposium (IPDPS'16)"
+    city: "Chicago"
+    region: "IL"
+    country: "USA"
+    date-start: 2016-05-23
+    date-end: 2016-05-27
+  month: 5
+  start: 596 
+  end: 607 
+  title: "System Noise Revisited: Enabling Application Scalability and Reproducibility with SMT"
+  year: 2016
+
