@@ -13,7 +13,7 @@
  */
 
 /*
- * Defaults 
+ * Defaults
  */
 #define MAX_SAMPLES    30000000
 //#define MIN_SAMPLES    1000
@@ -36,22 +36,20 @@ static long long work_length;
 static int work_bits = DEFAULT_BITS;
 static unsigned long nsamples = DEFAULT_COUNT;
 
-/* Per-thread timing information */ 
+/* Per-thread timing information */
 ticks *cycles_total;
 double *secs_total;
 
-/* Threads are bound to CPUs */ 
+/* Threads are bound to CPUs */
 int *cpus = NULL;
-int cpus_size = 0; 
-
-
+int cpus_size = 0;
 
 /*
  * Usage
  */
 void usage(char *argv0)
 {
-  printf("Usage: %s [OPTIONS]\n", argv0); 
+  printf("Usage: %s [OPTIONS]\n", argv0);
   printf("Options:\n"
 	 "  -t, --threads NUM  Number of threads\n"
 	 "  -c, --cpus RANGE   Bind threads to these CPUs\n"
@@ -59,11 +57,10 @@ void usage(char *argv0)
 	 "  -w, --work NUM     Number of work bits\n"
 	 "  -o, --output FILE  Output file\n"
 	 "  -s, --stdout       Output results to STDOUT\n"
-	 "  -h, --help         Show this help message\n");	 
-  
+	 "  -h, --help         Show this help message\n");
+
   exit(0);
 }
-
 
 /*************************************************************************
  * FWQ core measurement                                                  *
@@ -73,7 +70,7 @@ void *fwq_core(void *arg)
   /* thread number, zero based. */
   int thread_num = (int)(intptr_t)arg;
   int offset;
-  
+
   ticks tick, tock;
   register unsigned long done;
   register long long count;
@@ -82,7 +79,6 @@ void *fwq_core(void *arg)
   double da, dx[VECLEN], dy[VECLEN];
   void daxpy();
 #endif
-
 
 #ifdef DAXPY
   /* Intialize FP work */
@@ -104,7 +100,7 @@ void *fwq_core(void *arg)
 
   char str[SHORT_STR_SIZE];
   get_cpu_affinity(str);
-  printf("Thread %d running on CPUs %s\n", thread_num, str); 
+  printf("Thread %d running on CPUs %s\n", thread_num, str);
 
   offset = thread_num * nsamples;
 
@@ -153,14 +149,14 @@ void *fwq_core(void *arg)
 	 operation. VECLEN should be chosen so that this work
 	 construct fits into L1 cache (for all hardware threads
 	 sharing a core) and have minimal hardware induced runtime
-	 variation. 
+	 variation.
       */
       count = wl;
       tick = getticks();
       for(count = wl; count<0; count++) {
 	daxpy( VECLEN, da, dx, 1, dy, 1 );
       }
-#else 				
+#else
     /* This is the default work construct. Be very careful with this
       as it is most important that "count" variable be in a register
       and the loop not get optimized away by over zealous compiler
@@ -188,7 +184,7 @@ void *fwq_core(void *arg)
 #endif /* MULTIPLIER */
       }
 #endif /* ASMx8664 or DAXPY or default */
-      tock = getticks();    
+      tock = getticks();
       samples[offset+done] = tock-tick;
   }
 
@@ -196,7 +192,7 @@ void *fwq_core(void *arg)
   /* now do the real sampling */
   /****************************/
 
-  double time_start = get_time(); 
+  double time_start = get_time();
   ticks cycles_start = getticks();
 
   for(done=0; done<nsamples; done++ ) {
@@ -235,7 +231,7 @@ void *fwq_core(void *arg)
       for(count = wl; count<0; count++) {
 	daxpy( VECLEN, da, dx, 1, dy, 1 );
       }
-#else 				
+#else
       /* Default core work loop */
       count = wl;
       tick = getticks();
@@ -251,16 +247,16 @@ void *fwq_core(void *arg)
 #endif /* MULTIITER */
       }
 #endif /* ASMx86 or DAXPY or default */
-      tock = getticks();    
+      tock = getticks();
       samples[offset+done] = tock-tick;
   }
-  
+
   ticks cycles_end = getticks();
   double time_end = get_time();
 
   cycles_total[thread_num] = cycles_end - cycles_start;
   secs_total[thread_num] = time_end - time_start;
-  
+
   return NULL;
 }
 
@@ -270,9 +266,8 @@ void daxpy( int n, double da, double *dx, int incx, double *dy, int incy )
   for( k=0; k<n; k++ ) {
     dx[k] += da*dy[k];
   }
-  return;    
+  return;
 }
-
 
 int main(int argc, char *argv[])
 {
@@ -288,17 +283,17 @@ int main(int argc, char *argv[])
      {"cpus",     required_argument, 0, 'c'},
      {0, 0, 0, 0}  // Terminator
     };
-  
+
   const char *optstring = "hsn:w:o:t:c:";
   int option_index = 0;
 
   /* Default output name prefix */
-  char outname[255]; 
+  char outname[255];
   sprintf(outname, "fwq-th-times.dat");
-  
-  int nthreads=1; 
+
+  int nthreads=1;
   int use_stdout=0;
-  
+
   int c;
   while ((c = getopt_long(argc, argv,
 			  optstring, long_options,
@@ -317,7 +312,7 @@ int main(int argc, char *argv[])
       nsamples = atoi(optarg);
       break;
     case 'c':
-      cpus = range2int(optarg, &cpus_size); 
+      cpus = range2int(optarg, &cpus_size);
       break;
     case 's':
       use_stdout = 1;
@@ -335,19 +330,19 @@ int main(int argc, char *argv[])
       printf("%d: %d\n", i, cpus[i]);
 #endif
 
-  /* 
-   * Input checks 
-   */ 
+  /*
+   * Input checks
+   */
   if (cpus && cpus_size < nthreads) {
     fprintf(stderr, "WARN: Given %d CPUs, but %d are needed\n",
 	    cpus_size, nthreads);
-    /* Revert to default binding */ 
+    /* Revert to default binding */
     cpus_size = 0;
   }
-  
+
   if (nsamples < MIN_SAMPLES || nsamples > MAX_SAMPLES) {
     fprintf(stderr,"WARN: Num samples valid range is [%d,%d]. "
-	    "Setting to %d\n", MIN_SAMPLES, MAX_SAMPLES, MIN_SAMPLES); 
+	    "Setting to %d\n", MIN_SAMPLES, MAX_SAMPLES, MIN_SAMPLES);
     nsamples = MIN_SAMPLES;
   }
 
@@ -357,9 +352,9 @@ int main(int argc, char *argv[])
     work_bits = MIN_BITS;
   }
 
-  /* 
+  /*
    * Parameters used
-   */ 
+   */
   work_length = 1 << work_bits;
 
   printf("Number of threads: %d\n", nthreads);
@@ -369,21 +364,21 @@ int main(int argc, char *argv[])
     printf("Output file: %s\n", outname);
 
   /*
-   * Storage 
-   */ 
+   * Storage
+   */
   samples = malloc(sizeof(unsigned long long)* nsamples * nthreads);
   assert(samples != NULL);
-  
+
   /* Per-thread timing */
-  cycles_total = malloc(sizeof(ticks) * nthreads); 
-  secs_total = malloc(sizeof(double) * nthreads); 
-  
+  cycles_total = malloc(sizeof(ticks) * nthreads);
+  secs_total = malloc(sizeof(double) * nthreads);
+
   pthread_t *threads = malloc(sizeof(pthread_t) * nthreads);
   assert(threads != NULL);
 
-  /* 
+  /*
    * Do the work
-   */ 
+   */
   int rc;
   for (i=1; i<nthreads; i++) {
     rc = pthread_create(&threads[i], NULL, fwq_core, (void *)(intptr_t)i);
@@ -404,7 +399,7 @@ int main(int argc, char *argv[])
 
   /*
    * Output results
-   */ 
+   */
   FILE *fp = (use_stdout) ? stdout : fopen(outname, "w");
   if (fp == NULL) {
     fprintf(stderr, "ERR: Cannot write to file %s", outname);
@@ -415,28 +410,28 @@ int main(int argc, char *argv[])
     fprintf(fp, "Speed: thread %d, cycles %lld, seconds %f, GHz %f\n",
 	    j, (long long)cycles_total[j], secs_total[j],
 	    ((double)cycles_total[j]) / (secs_total[j] * 1.0e9));
-  
+
   for (j=0; j<nthreads; j++) {
     fprintf(fp, "Thread %d running on CPUs %d\n", j,
 	    (cpus_size > 0) ? cpus[j] : j);
-    
-    for (i=0;i<nsamples;i++) 
+
+    for (i=0;i<nsamples;i++)
       fprintf(fp, "%lld\n", samples[nsamples*j + i]);
   }
 
-  /* 
+  /*
    * Clean up
-   */ 
+   */
   if (!use_stdout)
-    fclose(fp); 
+    fclose(fp);
   if (cpus)
-    free(cpus); 
+    free(cpus);
   free(threads);
   free(samples);
   free(cycles_total);
-  free(secs_total); 
+  free(secs_total);
 
   pthread_exit(NULL);
-  
+
   return 0;
 }
