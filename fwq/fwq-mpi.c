@@ -416,7 +416,7 @@ int main(int argc, char **argv)
       sprintf(fname_times, "%s", outname);
       FILE* tmp_fp = fopen(fname_times, "w");
       if(tmp_fp == NULL) {
-        fprintf(stderr, "can not create file");
+        fprintf(stderr, "Cannot create file");
         exit(EXIT_FAILURE);
       }
       fp = tmp_fp;
@@ -426,13 +426,11 @@ int main(int argc, char **argv)
 #if 0
       printf("Speed Process %d cycles %lld seconds %f GHz %f\n",
 	     j, (long long)cycles_all[j], seconds_all[j],
-	     ((double)cycles_all[j]) / (seconds_all[j] * 1.0e9)
-	     );
+	     ((double)cycles_all[j]) / (seconds_all[j] * 1.0e9));
 #endif
-      fprintf(fp, "Speed Process %d cycles %lld seconds %f GHz %f\n",
+      fprintf(fp, "Speed: process %d, cycles %lld, seconds %f, GHz %f\n",
 	      j, (long long)cycles_all[j], seconds_all[j],
-	      ((double)cycles_all[j]) / (seconds_all[j] * 1.0e9)
-	      );
+	      ((double)cycles_all[j]) / (seconds_all[j] * 1.0e9));
     }
 
     printf("Process 0\n"); fflush(stdout);
