@@ -28,7 +28,7 @@ $ srun -N1 -n84 fwq-mpi -n50000 -w16384 -o fwq-mpi-n50k-w14.dat
 $ flux run -N1 -n84 -x fwq-mpi -n50000 -w16384 -o fwq-mpi-n50k-w14.dat
 ```
 
-One can use the resource manager to place the processes on the desired CPUs, see [MAP tutorials](https://github.com/LLNL/mpibind/tree/master/tutorials).
+One can use the resource manager to place the processes on the desired CPUs, see [MAP tutorials](https://github.com/LLNL/mpibind/blob/master/doc/README.md).
 
 ### Running FWQ-THREADED
 
