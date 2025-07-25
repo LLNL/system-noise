@@ -26,7 +26,11 @@ extern "C" {
   int get_num_cpus();
   
   int get_cpu_affinity(char *buf); 
-  
+
+  int* range2int(const char *range, int *arr_size);
+
+  double get_time();
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
