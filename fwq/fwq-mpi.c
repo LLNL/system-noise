@@ -44,7 +44,7 @@ void *fwq_core(void *arg, unsigned long* cycles, double* seconds)
   /* thread number, zero based. */
   int thread_num = (int)(intptr_t)arg;
   int i=0,offset;
-  
+
   ticks tick, tock;
   ticks cycles_start, cycles_end, cycles_total;
   double time_start, time_end, time_total;
@@ -121,14 +121,14 @@ void *fwq_core(void *arg, unsigned long* cycles, double* seconds)
 	 operation. VECLEN should be chosen so that this work
 	 construct fits into L1 cache (for all hardware threads
 	 sharing a core) and have minimal hardware induced runtime
-	 variation. 
+	 variation.
       */
       count = wl;
       tick = getticks();
       for(count = wl; count<0; count++) {
 	daxpy( VECLEN, da, dx, 1, dy, 1 );
       }
-#else 				
+#else
     /* This is the default work construct. Be very careful with this
       as it is most important that "count" variable be in a register
       and the loop not get optimized away by over zealous compiler
@@ -156,13 +156,13 @@ void *fwq_core(void *arg, unsigned long* cycles, double* seconds)
 #endif /* MULTIPLIER */
       }
 #endif /* ASMx8664 or DAXPY or default */
-      tock = getticks();    
+      tock = getticks();
       *ptr = (unsigned long long) (tock-tick);
       ptr++;
   }
   time_end = MPI_Wtime();
   time_total = time_end - time_start;
-  
+
   /* A convenient interface is to ask the user for a duration to run
    * and the number of samples to take in that duration.  Based on the
    * test above, set the work loop below appropriately */
@@ -234,7 +234,7 @@ void *fwq_core(void *arg, unsigned long* cycles, double* seconds)
       for(count = wl; count<0; count++) {
 	daxpy( VECLEN, da, dx, 1, dy, 1 );
       }
-#else 				
+#else
       /* Default core work loop */
       count = wl;
       tick = getticks();
@@ -250,7 +250,7 @@ void *fwq_core(void *arg, unsigned long* cycles, double* seconds)
 #endif /* MULTIITER */
       }
 #endif /* ASMx86 or DAXPY or default */
-      tock = getticks();    
+      tock = getticks();
       *ptr = (unsigned long long) tock-tick;
       ptr++;
   }
@@ -272,7 +272,7 @@ void daxpy( int n, double da, double *dx, int incx, double *dy, int incy )
   for( k=0; k<n; k++ ) {
     dx[k] += da*dy[k];
   }
-  return;    
+  return;
 }
 
 int main(int argc, char **argv)
@@ -312,12 +312,12 @@ int main(int argc, char **argv)
 	 {"threads",0,0,'t'},
 	 {0,0,0,0}
        };
-    
+
        c = getopt_long(argc, argv, "n:hsw:d:o:t:",
 		       long_options, &option_index);
-       if (c == -1) 
+       if (c == -1)
 	 break;
-    
+
        switch (c) {
        case 't':
          if (rank == 0) {
@@ -366,7 +366,7 @@ int main(int argc, char **argv)
     }
     numsamples = MIN_SAMPLES;
   }
-  
+
   /* allocate sample storage */
   samples = malloc(sizeof(unsigned long long)*numsamples*numthreads);
   assert(samples != NULL);
@@ -380,8 +380,8 @@ int main(int argc, char **argv)
 
   /* Record where everybody is running */
   char cpus[SHORT_STR_SIZE];
-  get_cpu_affinity(cpus); 
-  
+  get_cpu_affinity(cpus);
+
   /* sync procs up as best we can before starting the measurements */
   MPI_Barrier(MPI_COMM_WORLD);
 
@@ -398,7 +398,7 @@ int main(int argc, char **argv)
   double* seconds_all =
     (double*) malloc(ranks * sizeof(double));
   char* cpus_all =
-    (char *) malloc(ranks * sizeof(char) * SHORT_STR_SIZE); 
+    (char *) malloc(ranks * sizeof(char) * SHORT_STR_SIZE);
 
   MPI_Gather(&cycles,  1, MPI_UNSIGNED_LONG,
 	     cycles_all,  1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
@@ -466,6 +466,6 @@ int main(int argc, char **argv)
   free(samples);
 
   MPI_Finalize();
-  
+
   exit(EXIT_SUCCESS);
 }
