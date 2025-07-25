@@ -18,7 +18,7 @@ This builds `fwq`, `fwq-th`, and `fwq-mpi`, the serial, threaded, and MPI versio
 
 ### Running FWQ-MPI
 
-Run the benchmark on all the *user* cores of a node. For example: 
+Run the benchmark on all the *user* Cores of a node. For example:
 ```
 # Slurm
 $ srun -N1 -n84 fwq-mpi -n50000 -w16384 -o fwq-mpi-n50k-w14.dat
@@ -27,6 +27,8 @@ $ srun -N1 -n84 fwq-mpi -n50000 -w16384 -o fwq-mpi-n50k-w14.dat
 # Flux
 $ flux run -N1 -n84 -x fwq-mpi -n50000 -w16384 -o fwq-mpi-n50k-w14.dat
 ```
+
+One can use the resource manager to place the processes on the desired CPUs, see [MAP tutorials](https://github.com/LLNL/mpibind/tree/master/tutorials).
 
 ### Running FWQ-THREADED
 
@@ -42,6 +44,9 @@ Options:
   -s, --stdout       Output results to STDOUT
   -h, --help         Show this help message
 ```
+
+Since this program uses a single process, it provides a parameter to place the threads on specific CPUs: `-c`
+
 
 For example, on a compute node with 48 cores: 
 ```
