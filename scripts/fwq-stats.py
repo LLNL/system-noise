@@ -22,10 +22,12 @@ def parse_fwq_file(fname):
             if x:=re.search(r"Speed.+GHz\s+([\d.]+)", line):
                 # Get result in us
                 cpu_freq = float(x.group(1)) * 1e3
-            elif x:=re.search(r"^Process\s+(\d+).+CPUs\s+(\S+)", line):
-                task = x.group(1)
-                cpus[task] = x.group(2)
+                #print(cpu_freq)
+            elif x:=re.search(r"^(Process|Thread)\s+(\d+).+CPUs\s+(\S+)",line):
+                task = x.group(2)
+                cpus[task] = x.group(3)
                 cycles[task] = []
+                #print(x.group(1), x.group(2), x.group(3))
             elif task is not None: 
                 cycles[task].append(int(line.strip()) / cpu_freq)
     #return cycles
@@ -53,7 +55,7 @@ def calc_stats(file):
     task_max = std_all.idxmax()
     selected = [task_min, task_max]
     for task in selected:
-        print("Process {:>2} on CPUs {} with std {:.4f}"
+        print("Worker {:>2} on CPUs {} with std {:.4f}"
               .format(task, cpus[task], std_all[task]))
     print(stats_all[selected])
 
@@ -64,6 +66,6 @@ if (len(sys.argv) == 1):
 
 cpus = {}
 for file in sys.argv[1:]:
+    #parse_fwq_file(file)
     calc_stats(file)
-
 
