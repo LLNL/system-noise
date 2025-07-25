@@ -51,9 +51,4 @@ extern long long getticks(void);
 #include "cycle.h"
 #endif /* Plan9 */
 
-#ifdef _WITH_PTHREADS_
-#include <pthread.h>
-#endif
-
-
 #endif /* __FTQ_H__ */

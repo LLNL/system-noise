@@ -1,63 +1,75 @@
-// Todo:
-// Need to fix the pinning of threads
-// May want to add a parameter that specifies the places
-// Or get the current cpuset and distribute the threads
-// over those CPUs. 
 #define _GNU_SOURCE
 #include "ftq.h"
+#include <pthread.h>
 
-/* affinity */
-#ifdef _WITH_PTHREADS_
+/* Affinity */
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <sched.h>
-#endif
-
 #include "affinity.h"
 
-/**
- * macros and defines
+/*
+ * Macros and defines
  */
 
-/** defaults **/
+/*
+ * Defaults 
+ */
 #define MAX_SAMPLES    30000000
-#define MIN_SAMPLES    1000
+//#define MIN_SAMPLES    1000
+#define MIN_SAMPLES    100
 #define DEFAULT_COUNT  10000
 #define DEFAULT_BITS   20
 #define MAX_BITS       30
-#define MIN_BITS       3
+#define MIN_BITS       10
 #define MULTIITER
 #define ITERCOUNT      32
 #define VECLEN         1024
 
-/**
- * global variables
+/*
+ * Global variables
  */
 
-/* samples: each sample has a timestamp and a work count. */
+/* Samples: each sample has a timestamp and a work count. */
 static unsigned long long *samples;
 static long long work_length;
 static int work_bits = DEFAULT_BITS;
-static unsigned long numsamples = DEFAULT_COUNT;
+static unsigned long nsamples = DEFAULT_COUNT;
 
-/**
- * usage()
+/* Per-thread timing information */ 
+ticks *cycles_total;
+double *secs_total;
+
+/* Threads are bound to CPUs */ 
+int *cpus = NULL;
+int cpus_size = 0; 
+
+
+
+/*
+ * Usage
  */
-void usage(char *av0) {
-#ifdef _WITH_PTHREADS_
-  fprintf(stderr,"usage: %s [-t threads] [-n samples] [-w bits] [-h] [-o outname] [-s]\n",
-	  av0);
-#else
-  fprintf(stderr,"usage: %s [-n samples] [-w bits] [-h] [-o outname] [-s]\n",
-	  av0);
-#endif
-  exit(EXIT_FAILURE);
+void usage(char *argv0)
+{
+  printf("Usage: %s [OPTIONS]\n", argv0); 
+  printf("Options:\n"
+	 "  -t, --threads NUM  Number of threads\n"
+	 "  -c, --cpus RANGE   Bind threads to these CPUs\n"
+	 "  -n, --samples NUM  Number of samples per thread\n"
+	 "  -w, --work NUM     Number of work bits\n"
+	 "  -o, --output FILE  Output file\n"
+	 "  -s, --stdout       Output results to STDOUT\n"
+	 "  -h, --help         Show this help message\n");	 
+  
+  exit(0);
 }
 
+
 /*************************************************************************
- * FWQ core: does the measurement                                        *
+ * FWQ core measurement                                                  *
  *************************************************************************/
-void *fwq_core(void *arg) {
+void *fwq_core(void *arg)
+{
   /* thread number, zero based. */
   int thread_num = (int)(intptr_t)arg;
   int offset;
@@ -71,7 +83,7 @@ void *fwq_core(void *arg) {
   void daxpy();
 #endif
 
-  printf("Starting FWQ_CORE with work_length = %lld\n", work_length);
+
 #ifdef DAXPY
   /* Intialize FP work */
   da = 1.0e-6;
@@ -81,36 +93,25 @@ void *fwq_core(void *arg) {
   }
 #endif
 
-#ifdef _WITH_PTHREADS_ 
-  /* affinity stuff */
-  /* unsigned long mask = 0x1; */
-  /* mask = mask<<(thread_num+1); */
-  /* printf("thread number = %d with affinity mask = %d\n", thread_num, mask); */
+  /* Bind the threads */
   cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
-  CPU_SET(thread_num+1, &cpuset);
+  CPU_SET((cpus_size > 0) ? cpus[thread_num] : thread_num, &cpuset);
 
-  printf("thread number = %d with affinity mask = %d\n", thread_num, thread_num+1);
-  //if (pthread_setaffinity_np( pthread_self(), sizeof ( mask ), &mask ) < 0 ) {
-
-  int rc = pthread_setaffinity_np( pthread_self(), sizeof(cpu_set_t), &cpuset);
-  printf("rc=%d\n", rc); 
-  if (rc != 0) {
-    printf("Error!\n"); 
+  int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+  if (rc != 0)
     perror("pthread_setaffinity_np");
-  }
 
-  char cpus[SHORT_STR_SIZE];
-  get_cpu_affinity(cpus);
-  printf("%d: Running on cpus %s\n", thread_num, cpus); 
-#endif
+  char str[SHORT_STR_SIZE];
+  get_cpu_affinity(str);
+  printf("Thread %d running on CPUs %s\n", thread_num, str); 
 
-  offset = thread_num * numsamples;
+  offset = thread_num * nsamples;
 
   /***************************************************/
-  /* first, warm things up with 1000 test iterations */
+  /* First, warm things up with 1000 test iterations */
   /***************************************************/
-  for(done=0; done<1000; done++ ) {
+  for (done=0; done<MIN_SAMPLES; done++) {
 
 #ifdef ASMx8664
     /* Core work construct written as loop in gas (GNU Assembler) for
@@ -195,7 +196,10 @@ void *fwq_core(void *arg) {
   /* now do the real sampling */
   /****************************/
 
-  for(done=0; done<numsamples; done++ ) {
+  double time_start = get_time(); 
+  ticks cycles_start = getticks();
+
+  for(done=0; done<nsamples; done++ ) {
 
 #ifdef ASMx8664
     /* Core work loop in gas */
@@ -250,9 +254,16 @@ void *fwq_core(void *arg) {
       tock = getticks();    
       samples[offset+done] = tock-tick;
   }
+  
+  ticks cycles_end = getticks();
+  double time_end = get_time();
 
+  cycles_total[thread_num] = cycles_end - cycles_start;
+  secs_total[thread_num] = time_end - time_start;
+  
   return NULL;
 }
+
 void daxpy( int n, double da, double *dx, int incx, double *dy, int incy )
 {
   register int k;
@@ -262,202 +273,170 @@ void daxpy( int n, double da, double *dx, int incx, double *dy, int incy )
   return;    
 }
 
-/**
- * main()
- */
-int main(int argc, char **argv) {
-  /* local variables */
-  char fname_times[1024], buf[32], outname[255];
+
+int main(int argc, char *argv[])
+{
+  // Define long options
+  static struct option long_options[] =
+    {
+     {"help",     no_argument,       0, 'h'},
+     {"stdout",   no_argument,       0, 's'},
+     {"samples",  required_argument, 0, 'n'},
+     {"work",     required_argument, 0, 'w'},
+     {"output",   required_argument, 0, 'o'},
+     {"threads",  required_argument, 0, 't'},
+     {"cpus",     required_argument, 0, 'c'},
+     {0, 0, 0, 0}  // Terminator
+    };
+  
+  const char *optstring = "hsn:w:o:t:c:";
+  int option_index = 0;
+
+  /* Default output name prefix */
+  char outname[255]; 
+  sprintf(outname, "fwq-th-times.dat");
+  
+  int nthreads=1; 
+  int use_stdout=0;
+  
+  int c;
+  while ((c = getopt_long(argc, argv,
+			  optstring, long_options,
+			  &option_index)) != -1) {
+    switch (c) {
+    case 't':
+      nthreads = atoi(optarg);
+      break;
+    case 'o':
+      sprintf(outname, "%s", optarg);
+      break;
+    case 'w':
+      work_bits = atoi(optarg);
+      break;
+    case 'n':
+      nsamples = atoi(optarg);
+      break;
+    case 'c':
+      cpus = range2int(optarg, &cpus_size); 
+      break;
+    case 's':
+      use_stdout = 1;
+      break;
+    default:
+      usage(argv[0]);
+      break;
+    }
+  }
+
   int i,j;
-  int numthreads = 1, use_threads = 0;
-  int fp;
-  int use_stdout = 0;
-#ifdef _WITH_PTHREADS_
-  int rc;
-  pthread_t *threads;
-  //unsigned long mask = 1;
-  cpu_set_t cpuset;
+#if 0
+  if (cpus)
+    for (i=0; i<cpus_size; i++)
+      printf("%d: %d\n", i, cpus[i]);
 #endif
 
-  /* default output name prefix */
-  sprintf(outname,"fwq");
-
-#ifdef Plan9
-  ARGBEGIN{
-  case 's':
-    use_stdout = 1;
-    break;
-  case 'o':
-    char *tmp = ARGF();
-    if(tmp == nil)
-      usage(argv0);
-      sprintf(outname,"%s",tmp);
-    break;
-  case 'w':
-    work_bits = atoi(ARGF());
-    break;
-  case 'n':
-    numsamples = atoi(ARGF());
-    break;
-  case 'h':
-  default:
-    usage(argv0);
-  }ARGEND
-#else
-     /*
-      * getopt_long to parse command line options.
-      * basically the code from the getopt man page.
-      */
-     while (1) {
-       int c;
-       int option_index = 0;
-       static struct option long_options[] = {
-	 {"help",0,0,'h'},
-	 {"numsamples",0,0,'n'},
-	 {"work",0,0,'w'},
-	 {"outname",0,0,'o'},
-	 {"stdout",0,0,'s'},
-	 {"threads",0,0,'t'},
-	 {0,0,0,0}
-       };
-    
-       c = getopt_long(argc, argv, "n:hsw:o:t:",
-		       long_options, &option_index);
-       if (c == -1) 
-	 break;
-    
-       switch (c) {
-       case 't':
-#ifndef _WITH_PTHREADS_
-	 fprintf(stderr,"ERROR: ftq not compiled with pthreads support.\n");
-	 exit(EXIT_FAILURE);
-#endif
-	 numthreads = atoi(optarg);
-	 use_threads = 1;
-	 break;
-       case 's':
-	 use_stdout = 1;
-	 break;
-       case 'o':
-	 sprintf(outname,"%s",optarg);
-	 break;
-       case 'w':
-	 work_bits = atoi(optarg);
-	 break;
-       case 'n':
-	 numsamples = atoi(optarg);
-	 break;
-       case 'h':
-       default:
-	 usage(argv[0]);
-	 break;
-       }
-     }
-#endif /* Plan9 */
-
-  /* sanity check */
-  if (numsamples > MAX_SAMPLES) {
-    fprintf(stderr,"WARNING: sample count exceeds maximum.\n");
-    fprintf(stderr,"         setting count to maximum.\n");
-    numsamples = MAX_SAMPLES;
-  }
-  if (numsamples < MIN_SAMPLES) {
-    fprintf(stderr,"WARNING: sample count less than minimum.\n");
-    fprintf(stderr,"         setting count to minimum.\n");
-    numsamples = MIN_SAMPLES;
+  /* 
+   * Input checks 
+   */ 
+  if (cpus && cpus_size < nthreads) {
+    fprintf(stderr, "WARN: Given %d CPUs, but %d are needed\n",
+	    cpus_size, nthreads);
+    /* Revert to default binding */ 
+    cpus_size = 0;
   }
   
-  /* allocate sample storage */
-  samples = malloc(sizeof(unsigned long long)*numsamples*numthreads);
+  if (nsamples < MIN_SAMPLES || nsamples > MAX_SAMPLES) {
+    fprintf(stderr,"WARN: Num samples valid range is [%d,%d]. "
+	    "Setting to %d\n", MIN_SAMPLES, MAX_SAMPLES, MIN_SAMPLES); 
+    nsamples = MIN_SAMPLES;
+  }
+
+  if (work_bits < MIN_BITS || work_bits > MAX_BITS) {
+    fprintf(stderr,"WARN: Work bits valid range is [%d,%d]. "
+	    "Setting to %d.\n", MIN_BITS, MAX_BITS, MIN_BITS);
+    work_bits = MIN_BITS;
+  }
+
+  /* 
+   * Parameters used
+   */ 
+  work_length = 1 << work_bits;
+
+  printf("Number of threads: %d\n", nthreads);
+  printf("Work per thread: %lld\n", work_length);
+  printf("Number of samples per thread: %ld\n", nsamples);
+  if (!use_stdout)
+    printf("Output file: %s\n", outname);
+
+  /*
+   * Storage 
+   */ 
+  samples = malloc(sizeof(unsigned long long)* nsamples * nthreads);
   assert(samples != NULL);
-
-  if (work_bits > MAX_BITS || work_bits < MIN_BITS) {
-    fprintf(stderr,"WARNING: work bits invalid. set to %d.\n", MAX_BITS);
-    work_bits = MAX_BITS;
-  }
-
-  if (use_threads == 1 && numthreads < 2) {
-    fprintf(stderr,"ERROR: >1 threads required for multithread mode.\n");
-    exit(EXIT_FAILURE);
-  }
-
-  if (use_threads == 1 && use_stdout == 1) {
-    fprintf(stderr,"ERROR: cannot output to stdout for multithread mode.\n");
-    exit(EXIT_FAILURE);
-  }
-
-  /* set up sampling.  first, take a few bogus samples to warm up the
-   *  cache and pipeline */
-  work_length = 1 << work_bits;  
-
-  if (use_threads == 1) {
-#ifdef _WITH_PTHREADS_
-    CPU_ZERO(&cpuset);
-    CPU_SET(0, &cpuset);
-    //if (sched_setaffinity(0, sizeof(mask), &mask) < 0 ) {
-    if (sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) < 0 ) {
-      perror("sched_setaffinity");
-    }
-    threads = malloc(sizeof(pthread_t)*numthreads);
-    assert(threads != NULL);
-
-    printf("numthreads = %d\n", numthreads);
-    for (i=1;i<numthreads;i++) {
-      printf("thread number %d being created.\n",i);
-      rc = pthread_create(&threads[i], NULL, fwq_core, (void *)(intptr_t)i);
-      if (rc) {
-        fprintf(stderr,"ERROR: pthread_create() failed.\n");
-        exit(EXIT_FAILURE);
-      }
-    }
-    fwq_core(0);
-
-    for (i=1;i<numthreads;i++) {
-      rc = pthread_join(threads[i],NULL);
-      if (rc) {
-	fprintf(stderr,"ERROR: pthread_join() failed.\n");
-	exit(EXIT_FAILURE);
-      }
-    }
-
-    free(threads);
-#endif /* _WITH_PTHREADS_ */
-  } else {
-    fwq_core(0);
-  }
-
-  if (use_stdout == 1) {
-    for (i=0;i<numsamples;i++) {
-      fprintf(stdout,"%lld\n",samples[i]);
-    }
-  } else {
-
-    for (j=0;j<numthreads;j++) {
-      sprintf(fname_times,"%s_%d_times.dat",outname,j);
-
-#ifdef Plan9
-      fp = create(fname_times, OWRITE, 700);
-#else
-      fp = open(fname_times, O_CREAT|O_TRUNC|O_WRONLY, 0644);
-#endif 
-      if(fp < 0) {
-	perror("can not create file");
-	exit(EXIT_FAILURE);
-      }
-      for (i=0;i<numsamples;i++) {
-	sprintf(buf, "%lld\n", samples[i+(numsamples*j)]);
-	write(fp, buf, strlen(buf));
-      }
-      close(fp);
-      
-    }
-  }
   
+  /* Per-thread timing */
+  cycles_total = malloc(sizeof(ticks) * nthreads); 
+  secs_total = malloc(sizeof(double) * nthreads); 
+  
+  pthread_t *threads = malloc(sizeof(pthread_t) * nthreads);
+  assert(threads != NULL);
+
+  /* 
+   * Do the work
+   */ 
+  int rc;
+  for (i=1; i<nthreads; i++) {
+    rc = pthread_create(&threads[i], NULL, fwq_core, (void *)(intptr_t)i);
+    if (rc) {
+      fprintf(stderr,"ERR: pthread_create failed\n");
+      exit(EXIT_FAILURE);
+    }
+  }
+  fwq_core(0);
+
+  for (i=1; i<nthreads; i++) {
+    rc = pthread_join(threads[i],NULL);
+    if (rc) {
+      fprintf(stderr,"ERR: pthread_join failed\n");
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  /*
+   * Output results
+   */ 
+  FILE *fp = (use_stdout) ? stdout : fopen(outname, "w");
+  if (fp == NULL) {
+    fprintf(stderr, "ERR: Cannot write to file %s", outname);
+    exit(EXIT_FAILURE);
+  }
+
+  for (j=0; j<nthreads; j++)
+    fprintf(fp, "Speed: thread %d, cycles %lld, seconds %f, GHz %f\n",
+	    j, (long long)cycles_total[j], secs_total[j],
+	    ((double)cycles_total[j]) / (secs_total[j] * 1.0e9));
+  
+  for (j=0; j<nthreads; j++) {
+    fprintf(fp, "Thread %d running on CPUs %d\n", j,
+	    (cpus_size > 0) ? cpus[j] : j);
+    
+    for (i=0;i<nsamples;i++) 
+      fprintf(fp, "%lld\n", samples[nsamples*j + i]);
+  }
+
+  /* 
+   * Clean up
+   */ 
+  if (!use_stdout)
+    fclose(fp); 
+  if (cpus)
+    free(cpus); 
+  free(threads);
   free(samples);
-  
-#ifdef _WITH_PTHREADS_
-  pthread_exit(NULL);
-#endif
+  free(cycles_total);
+  free(secs_total); 
 
-  exit(EXIT_SUCCESS);
+  pthread_exit(NULL);
+  
+  return 0;
 }

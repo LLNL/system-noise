@@ -58,11 +58,11 @@ fwq.s: ftq.h fwq.c
 
 # Fixed WORK quanta benchmark for use with mutiple threads
 fwq-th: ftq.h fwq-th.c cpu.o
-	$(CC) -I../utils $(CFLAGS) -Wall fwq-th.c cpu.o -D_WITH_PTHREADS_ -o fwq-th -lpthread
+	$(CC) -I../utils $(CFLAGS) -g -Wall fwq-th.c cpu.o -o fwq-th -lpthread
 
 # Use MPI processes to run an FWQ instance per core
 fwq-mpi: ftq.h fwq-mpi.c cpu.o
-	$(MPICC) -I../utils $(CFLAGS) fwq-mpi.c cpu.o -o fwq-mpi
+	$(MPICC) -I../utils $(CFLAGS) -g -Wall fwq-mpi.c cpu.o -o fwq-mpi
 
 cpu.o: ../utils/cpu.c
 	$(CC) -Wall -Werror -c $< 
