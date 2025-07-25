@@ -2,7 +2,7 @@
 
 This project includes system-noise related software including benchmarks to assess the presence of noise on supercomputers. System noise is any activity that interferes with the execution of high-performance computing applications.
 
-Currently, the project consists of the Fixed Work Quanta (FWQ) benchmarks, which includes serial, threaded, and MPI variations. 
+Currently, the project consists of the Fixed Work Quanta (FWQ) benchmarks, which include serial, threaded, and MPI variations. 
 
 
 ## FWQ 
@@ -13,37 +13,93 @@ pushd fwq
 make 
 popd
 ```
-This will build `fwq`, `fwq-th`, and `fwq-mpi`, the single, threaded, and MPI versions of FWQ, respectively.  
+This builds `fwq`, `fwq-th`, and `fwq-mpi`, the serial, threaded, and MPI versions of FWQ, respectively.  
+
 
 ### Running FWQ-MPI
 
 Run the benchmark on all the *user* cores of a node. For example: 
 ```
-flux run -N1 -n84 -x fwq/fwq-mpi -n50000 -w16384 -o fwq-mpi-n50k-w14.dat
+# Slurm
+$ srun -N1 -n84 fwq-mpi -n50000 -w16384 -o fwq-mpi-n50k-w14.dat
+```
+```
+# Flux
+$ flux run -N1 -n84 -x fwq-mpi -n50000 -w16384 -o fwq-mpi-n50k-w14.dat
+```
+
+### Running FWQ-THREADED
+
+```
+$ fwq-th -h
+Usage: ./fwq-th [OPTIONS]
+Options:
+  -t, --threads NUM  Number of threads
+  -c, --cpus RANGE   Bind threads to these CPUs
+  -n, --samples NUM  Number of samples per thread
+  -w, --work NUM     Number of work bits
+  -o, --output FILE  Output file
+  -s, --stdout       Output results to STDOUT
+  -h, --help         Show this help message
+```
+
+For example, on a compute node with 48 cores: 
+```
+$ fwq-th -t 48 -c 0-47
+Number of threads: 48
+Work per thread: 1048576
+Number of samples per thread: 10000
+Output file: fwq-th-times.dat
+Thread 0 running on CPUs 0
+Thread 2 running on CPUs 2
+Thread 1 running on CPUs 1
+Thread 4 running on CPUs 4
+Thread 3 running on CPUs 3
+[...]
+Thread 43 running on CPUs 43
+Thread 44 running on CPUs 44
+Thread 45 running on CPUs 45
+Thread 46 running on CPUs 46
+Thread 47 running on CPUs 47
 ```
 
 ### Calculate basic statistics
 
-The program `utils/fwq-stats.py` calculates and reports basic statistics for two processes: the one with the min standard deviation (std) and the one with the max standard deviation. 
+The program `utils/fwq-stats.py` calculates and reports basic statistics for two workers: the one with the min standard deviation (std) and the one with the max standard deviation. 
 
 For example: 
 ```
-python utils/fwq-stats.py fwq-mpi-n50k-w14.dat 
-```
-This command results in the following: 
-```
+$ python fwq-stats.py fwq-mpi-n50k-w14.dat 
 fwq-mpi-n50k-w14.dat
-                 33            75
+Worker  2 on CPUs 3 with std 0.0059
+Worker 76 on CPUs 87 with std 0.0438
+                  2            76
 count  49999.000000  49999.000000
-mean       8.856883      8.859093
-std        0.007211      0.280071
-min        8.850074      8.850074
-25%        8.850074      8.850074
-50%        8.860074      8.860074
-75%        8.860074      8.860074
-max        9.950083     70.080587
+mean       8.853355      8.854145
+std        0.005862      0.043767
+min        8.840091      8.840091
+25%        8.850091      8.850091
+50%        8.850091      8.850091
+75%        8.860091      8.860091
+max        9.640099     12.970133
 ```
-Process 33 has the lowest std (0.007) while process 75 has the highest std (0.280).
+
+Another example:
+```
+$ python fwq-stats.py fwq-th-times.dat 
+fwq-th-times.dat
+Worker 11 on CPUs 11 with std 2.1737
+Worker  5 on CPUs 5 with std 26.7153
+                11            5
+count  9999.000000  9999.000000
+mean   1131.527761  1132.815608
+std       2.173676    26.715265
+min    1128.835890  1129.035887
+25%    1130.085874  1130.325871
+50%    1130.755866  1131.085861
+75%    1132.145848  1132.615842
+max    1148.785640  2140.353246
+```
 
 
 ## Authors
