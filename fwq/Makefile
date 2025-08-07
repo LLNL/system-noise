@@ -9,9 +9,9 @@
 #--> compatible processor. If not, write your own!  
 #CFLAGS =-I../common -O1 -march=native -mtune=native -m64 -static flags
 
-CC    = gcc
-CXX   = g++
-MPICC = mpicc
+CC    ?= gcc
+CXX   ?= g++
+MPICC ?= mpicc
 
 ARCH = $(shell uname -m)
 
